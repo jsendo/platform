@@ -3,12 +3,22 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const t = require("io-ts");
 const axios_1 = require("./axios");
 exports.axios = axios_1.default;
+var utils_1 = require("./utils");
+exports.cloneSafe = utils_1.cloneSafe;
+exports.jsonStringifySafe = utils_1.jsonStringifySafe;
 const SendPayload = t.union([t.string, t.object]);
 exports.SendConfigEmail = t.partial({
     html: t.string,
     subject: t.string,
     text: t.string,
 });
+exports.SendConfigEmit_required = t.strict({
+    raw_event: t.object,
+});
+exports.SendConfigEmit_optional = t.partial({
+    event: t.object,
+});
+exports.SendConfigEmit = t.intersection([exports.SendConfigEmit_required, exports.SendConfigEmit_optional]);
 // interface SendConfigHTTPKv {
 // 	[key: string]: string;
 // }
@@ -17,8 +27,25 @@ const SendConfigHTTPAuth = t.strict({
     password: t.string,
     username: t.string,
 });
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods
+exports.HTTP_METHODS = [
+    "GET",
+    "HEAD",
+    "POST",
+    "PUT",
+    "DELETE",
+    "CONNECT",
+    "OPTIONS",
+    "TRACE",
+    "PATCH",
+];
+// HTTP method must be uppercase (for kotlin in coordinator -- i voted to make it case insensitive, but w.e for now)
+const SendConfigHTTPMethod = t.keyof(exports.HTTP_METHODS.reduce((acc, v) => {
+    acc[v] = null;
+    return acc;
+}, {}));
 const SendConfigHTTP_required = t.strict({
-    method: t.string,
+    method: SendConfigHTTPMethod,
     url: t.string,
 });
 const SendConfigHTTP_optional = t.partial({
@@ -55,6 +82,7 @@ exports.SendConfigSSE = t.strict({
 // XXX would be cool to have this and SendFunctionsWrapper be more shared
 exports.sendTypeMap = {
     email: exports.SendConfigEmail,
+    emit: exports.SendConfigEmit,
     http: exports.SendConfigHTTP,
     s3: exports.SendConfigS3,
     sql: exports.SendConfigSQL,

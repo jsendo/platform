@@ -1,70 +1,76 @@
 import axios from "axios"
+import { AxiosRequestConfig } from "axios"
+import * as buildURL from "axios/lib/helpers/buildURL"
+import * as querystring from "querystring"
+import { cloneSafe } from "./utils"
 
-/*
-function observability(resp) {
-  return {
-    request: resp.config,
-    response: {
-      status: resp.status,
-      headers: resp.headers,
-      data: resp.data,
-    },
-  }
-}
-
-export default async function(step: any, config) {
-  try {
-    const resp = await axios(config)
-    step.axios = observability(resp)
-    return resp.data
-  } catch (err) {
-    if (err.isAxiosError) {
-      step.axios = observability(err.response)
-    } else {
-      step.$error = err
+function cleanObject(o: {string: any}) {
+  for (const k in o || {}) {
+    if (typeof o[k] === "undefined") {
+      delete o[k]
     }
-    throw err
   }
 }
-*/
 
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURI
-// see non-escaped chars
-// this handles not encoding [!'()*]
-function encodeReservedChars(str) {
-  return str.replace(/[!'()*]/g, function(c) {
-    return '%' + c.charCodeAt(0).toString(16)
-  })
+// remove query params from url and put into config.params
+function removeSearchFromUrl(config: AxiosRequestConfig) {
+  if (!config.url) return
+  const url = new URL(config.url)
+  const queryString = url.search.substr(1)
+  if (queryString) {
+    // https://stackoverflow.com/a/8649003/387413
+    const urlParams = JSON.parse('{"' + queryString.replace(/&/g, '","').replace(/=/g,'":"') + '"}', function(key, value) {
+      return key === "" ? value : decodeURIComponent(value)
+    })
+    for (const k in urlParams) {
+      if (!config.params) config.params = {}
+      if (k in config.params) continue // params object > url query params
+      config.params[k] = urlParams[k]
+    }
+    url.search = ""
+    config.url = url.toString() // if ends with ? should be okay, but could be cleaner
+  }
 }
 
-export default async function(step: any, config, signConfig?) {
-  // XXX warn about mutating config object... or clone?
+// https://github.com/ttezel/twit/blob/master/lib/helpers.js#L11
+function oauth1ParamsSerializer(p: any) {
+  return querystring.stringify(p)
+    .replace(/\!/g, "%21")
+    .replace(/\'/g, "%27")
+    .replace(/\(/g, "%28")
+    .replace(/\)/g, "%29")
+    .replace(/\*/g, "%2A")
+}
+
+// XXX warn about mutating config object... or clone?
+export default async function(step: any, config: AxiosRequestConfig, signConfig?: any) {
+  cleanObject(config.headers)
+  cleanObject(config.params)
+  if (typeof config.data === "object") {
+    cleanObject(config.data)
+  }
+  removeSearchFromUrl(config)
   // OAuth1 request
   if (signConfig) {
     const {oauthSignerUri, token} = signConfig
-
-    // this handles encoding query string to make sure we match what we sign
-    const url = new URL(config.url)
-    url.search = encodeReservedChars(url.search.substr(1))
-    config.url = url.toString()
-
+    const requestData = {
+      method: config.method || "get",
+      url: buildURL(config.url, config.params, oauth1ParamsSerializer), // build url as axios will
+      data: config.data,
+    }
+    config.paramsSerializer = oauth1ParamsSerializer
     const payload = {
-      requestData: config,
+      requestData,
       token,
     }
     const oauthSignature = (await axios.post(oauthSignerUri, payload)).data
     if (!config.headers) config.headers = {}
     config.headers.Authorization = oauthSignature
   }
-  for (const k in config.headers || {}) {
-    if (typeof config.headers[k] === "undefined") {
-      delete config.headers[k]
-    }
-  }
   try {
     return (await axios(config)).data
   } catch (err) {
-    step.debug = err.response
+    if (err.response) step.debug = cloneSafe(err.response)
     throw err
   }
 }

@@ -1,8 +1,13 @@
 // purposefully test COMPILED platform.js! (just as lambda_maker would)
-const { $sendConfigRuntimeTypeChecker } = require("../dist")
+const { $sendConfigRuntimeTypeChecker, HTTP_METHODS } = require("../dist")
 
 function randString() {
   return ""+Math.random()
+}
+
+function randHttpMethod() {
+  const idx = Math.floor(Math.random() * HTTP_METHODS.length)
+  return HTTP_METHODS[idx]
 }
 
 const emptyConfig = {}
@@ -35,12 +40,37 @@ describe("$send.email", () => {
   })
 })
 
+describe("$send.emit", () => {
+  const checker = $sendConfigRuntimeTypeChecker.emit
+  let config
+  beforeEach(() => {
+    config = {
+      raw_event: {
+        key: randString(),
+      },
+    }
+  })
+
+  it("should fail with empty config", () => {
+    expect(() => checker({})).toThrow()
+  })
+
+  it("should pass with full config", () => {
+    expect(() => checker(config)).not.toThrow()
+  })
+
+  xit("should fail with .__extra", () => {
+    config.__extra = randString()
+    expect(() => checker(config)).toThrow()
+  })
+})
+
 describe("$send.http", () => {
   const checker = $sendConfigRuntimeTypeChecker.http
   let config
   beforeEach(() => {
     config = {
-      method: randString(),
+      method: randHttpMethod(),
       url: randString(),
       auth: {
         password: randString(),

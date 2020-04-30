@@ -1,14 +1,28 @@
 import * as t from "io-ts";
 import axios from "./axios";
 export { axios };
+export { cloneSafe, jsonStringifySafe } from "./utils";
 export declare const SendConfigEmail: t.PartialC<{
     html: t.StringC;
     subject: t.StringC;
     text: t.StringC;
 }>;
 export declare type SendConfigEmail = t.TypeOf<typeof SendConfigEmail>;
+export declare const SendConfigEmit_required: t.ExactC<t.TypeC<{
+    raw_event: t.ObjectC;
+}>>;
+export declare const SendConfigEmit_optional: t.PartialC<{
+    event: t.ObjectC;
+}>;
+export declare const SendConfigEmit: t.IntersectionC<[t.ExactC<t.TypeC<{
+    raw_event: t.ObjectC;
+}>>, t.PartialC<{
+    event: t.ObjectC;
+}>]>;
+export declare type SendConfigEmit = t.TypeOf<typeof SendConfigEmit>;
+export declare const HTTP_METHODS: string[];
 export declare const SendConfigHTTP: t.IntersectionC<[t.ExactC<t.TypeC<{
-    method: t.StringC;
+    method: t.KeyofC<{}>;
     url: t.StringC;
 }>>, t.PartialC<{
     auth: t.ExactC<t.TypeC<{
@@ -50,6 +64,7 @@ export declare const SendConfigSSE: t.ExactC<t.TypeC<{
 export declare type SendConfigSSE = t.TypeOf<typeof SendConfigSSE>;
 interface SendFunctionsWrapper {
     email: (config: SendConfigEmail) => void;
+    emit: (config: SendConfigEmit) => void;
     http: (config: SendConfigHTTP) => void;
     s3: (config: SendConfigS3) => void;
     sql: (config: SendConfigSQL) => void;
@@ -62,8 +77,13 @@ export declare const sendTypeMap: {
         subject: t.StringC;
         text: t.StringC;
     }>;
+    emit: t.IntersectionC<[t.ExactC<t.TypeC<{
+        raw_event: t.ObjectC;
+    }>>, t.PartialC<{
+        event: t.ObjectC;
+    }>]>;
     http: t.IntersectionC<[t.ExactC<t.TypeC<{
-        method: t.StringC;
+        method: t.KeyofC<{}>;
         url: t.StringC;
     }>>, t.PartialC<{
         auth: t.ExactC<t.TypeC<{

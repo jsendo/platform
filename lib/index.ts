@@ -3,6 +3,7 @@ import * as t from "io-ts"
 import axios from "./axios"
 
 export { axios }
+export { cloneSafe, jsonStringifySafe } from "./utils"
 
 const SendPayload = t.union([t.string, t.object]);
 type SendPayload = t.TypeOf<typeof SendPayload>;
@@ -14,6 +15,16 @@ export const SendConfigEmail = t.partial({
 });
 export type SendConfigEmail = t.TypeOf<typeof SendConfigEmail>;
 
+export const SendConfigEmit_required = t.strict({
+    raw_event: t.object,
+});
+
+export const SendConfigEmit_optional = t.partial({
+    event: t.object,
+});
+export const SendConfigEmit = t.intersection([SendConfigEmit_required, SendConfigEmit_optional]);
+export type SendConfigEmit = t.TypeOf<typeof SendConfigEmit>;
+
 // interface SendConfigHTTPKv {
 // 	[key: string]: string;
 // }
@@ -24,8 +35,26 @@ const SendConfigHTTPAuth = t.strict({
     username: t.string,
 });
 type SendConfigHTTPAuth = t.TypeOf<typeof SendConfigHTTPAuth>;
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods
+export const HTTP_METHODS = [
+    "GET",
+    "HEAD",
+    "POST",
+    "PUT",
+    "DELETE",
+    "CONNECT",
+    "OPTIONS",
+    "TRACE",
+    "PATCH",
+]
+// HTTP method must be uppercase (for kotlin in coordinator -- i voted to make it case insensitive, but w.e for now)
+const SendConfigHTTPMethod = t.keyof(HTTP_METHODS.reduce((acc, v) => {
+    acc[v] = null
+    return acc
+}, {}))
+type SendConfigHTTPMethod = t.TypeOf<typeof SendConfigHTTPMethod>;
 const SendConfigHTTP_required = t.strict({
-    method: t.string, // XXX proper enum for methods here?
+    method: SendConfigHTTPMethod,
     url: t.string,
 })
 const SendConfigHTTP_optional = t.partial({
@@ -73,6 +102,7 @@ export type SendConfigSSE = t.TypeOf<typeof SendConfigSSE>;
 // optionals so we can use self-invoking function below
 interface SendFunctionsWrapper {
     email: (config: SendConfigEmail) => void;
+    emit: (config: SendConfigEmit) => void;
     http: (config: SendConfigHTTP) => void;
     s3: (config: SendConfigS3) => void;
     sql: (config: SendConfigSQL) => void;
@@ -82,6 +112,7 @@ interface SendFunctionsWrapper {
 // XXX would be cool to have this and SendFunctionsWrapper be more shared
 export const sendTypeMap = {
     email: SendConfigEmail,
+    emit: SendConfigEmit,
     http: SendConfigHTTP,
     s3: SendConfigS3,
     sql: SendConfigSQL,
